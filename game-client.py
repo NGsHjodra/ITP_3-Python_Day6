@@ -94,6 +94,55 @@ class Player:
         self.rect.x = self.x
         self.rect.y = self.y
 
+class Bullet:
+    def __init__(self, screen, image_files, scale, angle):
+        self.x = 0
+        self.y = 0
+
+        self.screen_width = screen.get_width()
+        self.screen_height = screen.get_height()
+        self.screen = screen
+
+        self.width = 10
+        self.height = 10
+        self.color = "red"
+        self.speed_x = 0
+        self.speed_y = 0
+
+        self.is_active = True
+
+        self.image_index = 0
+
+        self.images = []
+        for file_name in image_files:
+            self.images.append(prepare_image(file_name, scale, angle))
+
+        self.image = self.images[self.image_index]
+        self.rect = self.image.get_rect()
+
+    def draw(self):
+        if not self.is_active:
+            return
+
+        pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
+
+    def update(self):
+
+        self.x += self.speed_x
+        self.y += self.speed_y
+
+        if self.x < 0 or self.x > self.screen_width or self.y < 0 or self.y > self.screen_height:
+            self.is_active = False
+            return
+
+        self.image_index += 1
+        self.image_index %= len(self.images)
+
+        self.image = self.images[self.image_index]
+
+        self.rect.x = self.x
+        self.rect.y = self.y
+
 @dataclass
 class EventsData:
     down_key: bool
@@ -122,6 +171,7 @@ async def receive_events(player, other_players, reader):
 
         logging.info(f"message received: {message.decode()}")
         data_parts=message.decode().split(",")
+        # print(data_parts)
 
         # while len(other_players) < len(data_parts) / 3:
         #     other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
@@ -132,26 +182,28 @@ async def receive_events(player, other_players, reader):
             player_id = int(data_parts[i])
             while len(other_players) <= player_id :
                 other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
-
+                print(f"adding player {player_id}")
+            ids.append(player_id)
+            # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
         for i in range(0, len(data_parts), 3):
             if data_parts[i] == "":
                 continue
             player_id = int(data_parts[i])
-            ids.append(player_id)
             if player_id == player.id:
+                # print('updating player')
                 player.x = float(data_parts[i+1])
                 player.y = float(data_parts[i+2])
             else:
-                print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
+                # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
                 other_players[player_id].x = float(data_parts[i+1])
                 other_players[player_id].y = float(data_parts[i+2])
                 other_players[player_id].id = player_id
 
         # remove players that are not in the list
-        for player in other_players:
-            if player.id not in ids and player_id != None:
-                print(f"removing player {player.id}")
-                other_players.remove(player)
+        for player_o in other_players:
+            if player_o.id not in ids and player_o.id != None:
+                print(f"removing player {player_o.id}")
+                other_players.remove(player_o)
 
 async def data_exchange(player, eventsData, other_players):
     reader, writer = await asyncio.open_connection('localhost', 8888)
@@ -160,6 +212,7 @@ async def data_exchange(player, eventsData, other_players):
     logging.info(f"initial data received: {initial_data.decode()}")
     data_parts=initial_data.decode().split(":")
     player.id = int(data_parts[1])
+    print(f"player id: {player.id}")
 
     send_events_task = asyncio.create_task(send_events(eventsData, writer))
     receive_events_task = asyncio.create_task(receive_events(player, other_players, reader))
@@ -232,11 +285,15 @@ def main():
         screen.fill("black")
 
         # draw other players
+        # print(f"other players: {len(other_players)}")
         for other_player in other_players:
-            other_player.update()
-            other_player.draw()
+            if other_player.id is not None:
+                # print(f"other player id: {other_player.id}")
+                other_player.update()
+                other_player.draw()
 
         if player.id is not None:
+            # print(f"player id: {player.id}")
             player.update()
             player.draw()
 

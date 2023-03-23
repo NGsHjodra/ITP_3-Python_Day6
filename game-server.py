@@ -115,6 +115,7 @@ class GameServer:
 
     async def start(self):
         server = await asyncio.start_server(self.handle_client, '0.0.0.0', 8888)
+        print(f'Server started at {server.sockets[0].getsockname()}')
 
         async with server:
             await server.serve_forever()
@@ -123,6 +124,7 @@ class GameServer:
         await asyncio.gather(self.start(), self.update_and_send_state())
 
 if __name__ == '__main__':
+
     format = "SRV: %(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.ERROR,
                         datefmt="%F-%H-%M-%S")
