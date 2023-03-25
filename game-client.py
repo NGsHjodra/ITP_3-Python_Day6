@@ -95,14 +95,14 @@ class Player:
         self.rect.y = self.y
 
 class Bullet:
-    def __init__(self, screen, image_files, scale, angle):
+    def __init__(self, screen, image_files, scale, angle, id):
         self.x = 0
         self.y = 0
 
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
         self.screen = screen
-
+        self.id = id
         self.width = 10
         self.height = 10
         self.color = "red"
@@ -165,38 +165,43 @@ async def send_events(eventsData, writer):
 
         logging.info(f"send_events coroutine: sent {message}")
 
-async def receive_events(player, other_players, reader):
+async def receive_events(player, other_players, bullets, reader):
     while running:
         message = await reader.readline()
 
         logging.info(f"message received: {message.decode()}")
-        data_parts=message.decode().split(",")
+        message = message.decode().strip()
+        players_list, bullets_list = message.split(":") if ":" in message else (message, None)
+
+        players_list = players_list.split(",")
+
+        bullets_list = bullets_list.split(",") if bullets_list is not None else []
         # print(data_parts)
 
         # while len(other_players) < len(data_parts) / 3:
         #     other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
         ids = []
-        for i in range(0, len(data_parts), 3):
-            if data_parts[i] == "":
+        for i in range(0, len(players_list), 3):
+            if players_list[i] == "":
                 continue
-            player_id = int(data_parts[i])
+            player_id = int(players_list[i])
             while len(other_players) <= player_id :
                 other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
                 print(f"adding player {player_id}")
             ids.append(player_id)
             # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
-        for i in range(0, len(data_parts), 3):
-            if data_parts[i] == "":
+        for i in range(0, len(players_list), 3):
+            if players_list[i] == "":
                 continue
-            player_id = int(data_parts[i])
+            player_id = int(players_list[i])
             if player_id == player.id:
                 # print('updating player')
-                player.x = float(data_parts[i+1])
-                player.y = float(data_parts[i+2])
+                player.x = float(players_list[i+1])
+                player.y = float(players_list[i+2])
             else:
                 # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
-                other_players[player_id].x = float(data_parts[i+1])
-                other_players[player_id].y = float(data_parts[i+2])
+                other_players[player_id].x = float(players_list[i+1])
+                other_players[player_id].y = float(players_list[i+2])
                 other_players[player_id].id = player_id
 
         # remove players that are not in the list
@@ -205,7 +210,32 @@ async def receive_events(player, other_players, reader):
                 print(f"removing player {player_o.id}")
                 other_players.remove(player_o)
 
-async def data_exchange(player, eventsData, other_players):
+        ids = []
+
+        for i in range(0, len(bullets_list), 3):
+            if bullets_list[i] == "":
+                continue
+            bullet_id = int(bullets_list[i])
+            while len(bullets) <= bullet_id:
+                bullets.append(Bullet(screen, ["images/bullet1.png", "images/bullet2.png", "images/bullet3.png"], 0.25, 0, bullet_id))
+            ids.append(bullet_id)
+
+        for i in range(0, len(bullets_list), 3):
+            if bullets_list[i] == "":
+                continue
+            bullet_id = int(bullets_list[i])
+            bullets[bullet_id].x = float(bullets_list[i+1])
+            bullets[bullet_id].y = float(bullets_list[i+2])
+            bullets[bullet_id].id = bullet_id
+
+        for bullet in bullets:
+            if bullet.id not in ids and bullet.id != None:
+                bullets.remove(bullet)
+        
+        # if len(other_players) != (len(data_parts) / 3):
+        #     print(f"something wrong: len(other_players): {len(other_players)}, len(data_parts): {len(data_parts)}")
+
+async def data_exchange(player, eventsData, other_players, bullets):
     reader, writer = await asyncio.open_connection('localhost', 8888)
 
     initial_data = await reader.readline()
@@ -215,18 +245,18 @@ async def data_exchange(player, eventsData, other_players):
     print(f"player id: {player.id}")
 
     send_events_task = asyncio.create_task(send_events(eventsData, writer))
-    receive_events_task = asyncio.create_task(receive_events(player, other_players, reader))
+    receive_events_task = asyncio.create_task(receive_events(player, other_players, bullets, reader))
 
     await asyncio.gather(send_events_task, receive_events_task)
 
     print("data_exchange coroutine finished")
 
-def data_exchange_thread_func(player, eventsData, other_players):
+def data_exchange_thread_func(player, eventsData, other_players, bullets):
     global running
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(data_exchange(player, eventsData, other_players))
+    loop.run_until_complete(data_exchange(player, eventsData, other_players, bullets))
 
     loop.close()
 
@@ -234,6 +264,8 @@ def data_exchange_thread_func(player, eventsData, other_players):
 
 def main():
     global running
+
+    bullets = []
 
     other_players = []
 
@@ -243,7 +275,7 @@ def main():
     eventsData = EventsData(False, False, False, False, False)
 
     # create data exchange thread
-    data_exchange_thread = threading.Thread(target=data_exchange_thread_func, args=(player, eventsData, other_players))
+    data_exchange_thread = threading.Thread(target=data_exchange_thread_func, args=(player, eventsData, other_players, bullets))
     data_exchange_thread.start()
 
     while running:
@@ -296,6 +328,11 @@ def main():
             # print(f"player id: {player.id}")
             player.update()
             player.draw()
+
+        # draw bullets
+        for bullet in bullets:
+            bullet.update()
+            bullet.draw()
 
         console.log(f"Player x: {int(player.x)}, y: {int(player.y)}")
         console.draw()
