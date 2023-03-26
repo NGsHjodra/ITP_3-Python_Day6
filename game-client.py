@@ -70,6 +70,7 @@ class Player:
         self.x = 0
         self.y = 0
         self.id = None
+        self.hit_points = 5
 
         self.screen = screen
 
@@ -147,7 +148,7 @@ async def receive_events(player, other_players, bullets, reader):
         bullets_list = bullets_list.split(",") if bullets_list is not None else []
         
         ids = []
-        for i in range(0, len(players_list), 3):
+        for i in range(0, len(players_list), 4):
             if players_list[i] == "":
                 continue
             player_id = int(players_list[i])
@@ -156,13 +157,14 @@ async def receive_events(player, other_players, bullets, reader):
                 print(f"adding player {player_id}")
             ids.append(player_id)
 
-        for i in range(0, len(players_list), 3):
+        for i in range(0, len(players_list), 4):
             if players_list[i] == "":
                 continue
             player_id = int(players_list[i])
             if player_id == player.id:
                 player.x = float(players_list[i+1])
                 player.y = float(players_list[i+2])
+                player.hit_points = int(players_list[i+3])
             else:
                 other_players[player_id].x = float(players_list[i+1])
                 other_players[player_id].y = float(players_list[i+2])
@@ -294,7 +296,8 @@ def main():
         for bullet in bullets:
             bullet.draw()
 
-        console.log(f"Player x: {int(player.x)}, y: {int(player.y)}")
+        console.log(f"Player x: {int(player.x)}, y: {int(player.y)}\n \
+                    Player hitpoints: {player.hit_points}\n")
         console.draw()
 
         # flip() the display to put your work on screen

@@ -13,6 +13,7 @@ class Player:
 
     speed_x: float = 0
     speed_y: float = 0
+    hit_points: int = 5
 
 @dataclass
 class Bullet:
@@ -88,9 +89,20 @@ class GameServer:
                             player.y -= 10
                         else:
                             player.y += 10
+                    
+                # aabb collision detection with bullets
+                for bullet in self.bullets:
+                    if (player.x < bullet.x + 5 and
+                        player.x + self.player_width > bullet.x and
+                        player.y < bullet.y + 5 and
+                        player.y + self.player_height > bullet.y):
+                        player.hit_points -= 1
+                        self.bullets.remove(bullet)
+                        if player.hit_points <= 0:
+                            self.players.remove(player)
                 
                 
-                game_state_encoded += f'{player.id},{player.x},{player.y},'
+                game_state_encoded += f'{player.id},{player.x},{player.y},{player.hit_points},'
 
             game_state_encoded += ':' # end of player state
 
