@@ -92,6 +92,8 @@ class GameServer:
                     
                 # aabb collision detection with bullets
                 for bullet in self.bullets:
+                    if bullet.player_id == player.id:
+                        continue
                     if (player.x < bullet.x + 5 and
                         player.x + self.player_width > bullet.x and
                         player.y < bullet.y + 5 and
