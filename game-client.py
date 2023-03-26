@@ -95,7 +95,7 @@ class Player:
         self.rect.y = self.y
 
 class Bullet:
-    def __init__(self, screen, image_files, scale, angle, id):
+    def __init__(self, screen, color, id):
         self.x = 0
         self.y = 0
 
@@ -105,43 +105,12 @@ class Bullet:
         self.id = id
         self.width = 10
         self.height = 10
-        self.color = "red"
-        self.speed_x = 0
-        self.speed_y = 0
-
-        self.is_active = True
+        self.color = color
 
         self.image_index = 0
 
-        self.images = []
-        for file_name in image_files:
-            self.images.append(prepare_image(file_name, scale, angle))
-
-        self.image = self.images[self.image_index]
-        self.rect = self.image.get_rect()
-
     def draw(self):
-        if not self.is_active:
-            return
-
         pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
-
-    def update(self):
-
-        self.x += self.speed_x
-        self.y += self.speed_y
-
-        if self.x < 0 or self.x > self.screen_width or self.y < 0 or self.y > self.screen_height:
-            self.is_active = False
-            return
-
-        self.image_index += 1
-        self.image_index %= len(self.images)
-
-        self.image = self.images[self.image_index]
-
-        self.rect.x = self.x
-        self.rect.y = self.y
 
 @dataclass
 class EventsData:
@@ -176,10 +145,7 @@ async def receive_events(player, other_players, bullets, reader):
         players_list = players_list.split(",")
 
         bullets_list = bullets_list.split(",") if bullets_list is not None else []
-        # print(data_parts)
-
-        # while len(other_players) < len(data_parts) / 3:
-        #     other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
+        
         ids = []
         for i in range(0, len(players_list), 3):
             if players_list[i] == "":
@@ -189,17 +155,15 @@ async def receive_events(player, other_players, bullets, reader):
                 other_players.append(Player(screen, ["images/e-ship1.png", "images/e-ship2.png", "images/e-ship3.png"], 0.25, 0))
                 print(f"adding player {player_id}")
             ids.append(player_id)
-            # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
+
         for i in range(0, len(players_list), 3):
             if players_list[i] == "":
                 continue
             player_id = int(players_list[i])
             if player_id == player.id:
-                # print('updating player')
                 player.x = float(players_list[i+1])
                 player.y = float(players_list[i+2])
             else:
-                # print(f"player_id: {player_id}, len(other_players): {len(other_players)}")
                 other_players[player_id].x = float(players_list[i+1])
                 other_players[player_id].y = float(players_list[i+2])
                 other_players[player_id].id = player_id
@@ -212,28 +176,28 @@ async def receive_events(player, other_players, bullets, reader):
 
         ids = []
 
-        for i in range(0, len(bullets_list), 3):
+        for i in range(0, len(bullets_list), 4):
             if bullets_list[i] == "":
                 continue
             bullet_id = int(bullets_list[i])
             while len(bullets) <= bullet_id:
-                bullets.append(Bullet(screen, ["images/bullet1.png", "images/bullet2.png", "images/bullet3.png"], 0.25, 0, bullet_id))
+                bullets.append(Bullet(screen, 'red', bullet_id))
             ids.append(bullet_id)
 
-        for i in range(0, len(bullets_list), 3):
+        for i in range(0, len(bullets_list), 4):
             if bullets_list[i] == "":
                 continue
             bullet_id = int(bullets_list[i])
-            bullets[bullet_id].x = float(bullets_list[i+1])
-            bullets[bullet_id].y = float(bullets_list[i+2])
+            bullet_player_id = int(bullets_list[i+1])
+            if bullet_player_id == player.id:
+                bullets[bullet_id].color = 'green'
+            bullets[bullet_id].x = float(bullets_list[i+2])
+            bullets[bullet_id].y = float(bullets_list[i+3])
             bullets[bullet_id].id = bullet_id
 
         for bullet in bullets:
             if bullet.id not in ids and bullet.id != None:
                 bullets.remove(bullet)
-        
-        # if len(other_players) != (len(data_parts) / 3):
-        #     print(f"something wrong: len(other_players): {len(other_players)}, len(data_parts): {len(data_parts)}")
 
 async def data_exchange(player, eventsData, other_players, bullets):
     reader, writer = await asyncio.open_connection('localhost', 8888)
@@ -317,21 +281,17 @@ def main():
         screen.fill("black")
 
         # draw other players
-        # print(f"other players: {len(other_players)}")
         for other_player in other_players:
             if other_player.id is not None:
-                # print(f"other player id: {other_player.id}")
                 other_player.update()
                 other_player.draw()
 
         if player.id is not None:
-            # print(f"player id: {player.id}")
             player.update()
             player.draw()
 
         # draw bullets
         for bullet in bullets:
-            bullet.update()
             bullet.draw()
 
         console.log(f"Player x: {int(player.x)}, y: {int(player.y)}")

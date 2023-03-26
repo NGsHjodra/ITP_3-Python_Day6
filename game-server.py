@@ -19,6 +19,7 @@ class Bullet:
     x: float
     y: float
     id: int
+    player_id: int
 
     speed_x: float = 0
     speed_y: float = 0
@@ -69,6 +70,24 @@ class GameServer:
                     player.speed_y -= self.acceleration * 0.5
                 elif player.speed_y < 0:
                     player.speed_y += self.acceleration * 0.5
+
+                # aabb collision detection with a knokback
+                for other_player in self.players:
+                    if other_player == player:
+                        continue
+
+                    if (player.x < other_player.x + self.player_width and
+                        player.x + self.player_width > other_player.x and
+                        player.y < other_player.y + self.player_height and
+                        player.y + self.player_height > other_player.y):
+                        if player.x < other_player.x:
+                            player.x -= 10
+                        else:
+                            player.x += 10
+                        if player.y < other_player.y:
+                            player.y -= 10
+                        else:
+                            player.y += 10
                 
                 
                 game_state_encoded += f'{player.id},{player.x},{player.y},'
@@ -85,7 +104,7 @@ class GameServer:
                     continue
 
                 # logging.error(f'Bullet {bullet.id} at {bullet.x}, {bullet.y}')
-                game_state_encoded += f'{bullet.id},{bullet.x},{bullet.y},'
+                game_state_encoded += f'{bullet.id},{bullet.player_id},{bullet.x},{bullet.y},'
 
             for player in self.players:
                 player.writer.write(f"{game_state_encoded[:-1]}\n".encode())
@@ -129,14 +148,12 @@ class GameServer:
                 player.speed_x += float(x_action)
                 player.speed_y += float(y_action)
 
-                new_id = 0
+                b_id = 0
                 if fire_action == '1\n':
-                    while new_id in [bullet.id for bullet in self.bullets]:
-                        new_id += 1
-                    bullet = Bullet(player.x, player.y, new_id, 0, 10)
-                    self.bullets.append(bullet)
-                    print(f'Bullet fired at {bullet.x}, {bullet.y}')
-                    
+                    while b_id in [bullet.id for bullet in self.bullets]:
+                        b_id += 1
+                    bullet = Bullet(player.x + self.player_width // 2, player.y - self.player_height // 2, b_id, new_id, 0, -10)
+                    self.bullets.append(bullet)                    
 
             except(ConnectionResetError, BrokenPipeError):
                 if player in self.players:
